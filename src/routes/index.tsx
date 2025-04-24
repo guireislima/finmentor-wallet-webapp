@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
+import Signup from '../pages/Signup';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -17,6 +18,7 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
       <Route
         path="/dashboard"
         element={
