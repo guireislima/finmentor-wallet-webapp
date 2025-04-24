@@ -1,0 +1,115 @@
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
+import { Box, Button, FormControl, FormLabel, Input, VStack, useToast, FormErrorMessage } from '@chakra-ui/react';
+import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
+
+interface LoginFormData {
+  login: string;
+  password: string;
+}
+
+const Login: React.FC = () => {
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>();
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const toast = useToast();
+
+  const onSubmit = async (data: LoginFormData) => {
+    try {
+      console.log('Submitting login form with data:', data);
+      const response = await api.post('/login', data);
+      console.log('Login response:', response);
+      
+      if (response.data && response.data.accessToken) {
+        login(response.data.accessToken);
+        toast({
+          title: 'Login successful',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+        navigate('/dashboard');
+      } else {
+        throw new Error('No access token received from server');
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      
+      let errorMessage = 'An error occurred during login';
+      
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response:', error.response);
+        errorMessage = error.response.data?.message || 'Invalid credentials';
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Error request:', error.request);
+        errorMessage = 'No response from server';
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message);
+        errorMessage = error.message;
+      }
+
+      toast({
+        title: 'Login failed',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top',
+      });
+    }
+  };
+
+  const handleLoginClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const formData = handleSubmit(onSubmit);
+    await formData();
+  };
+
+  return (
+    <Box maxW="md" mx="auto" mt={8} p={6} borderWidth="1px" borderRadius="lg">
+      <form>
+        <VStack spacing={4}>
+          <FormControl isInvalid={!!errors.login}>
+            <FormLabel>Login</FormLabel>
+            <Input
+              {...register('login', { required: 'Login is required' })}
+              placeholder="Enter your login"
+            />
+            <FormErrorMessage>
+              {errors.login && errors.login.message}
+            </FormErrorMessage>
+          </FormControl>
+
+          <FormControl isInvalid={!!errors.password}>
+            <FormLabel>Password</FormLabel>
+            <Input
+              type="password"
+              {...register('password', { required: 'Password is required' })}
+              placeholder="Enter your password"
+            />
+            <FormErrorMessage>
+              {errors.password && errors.password.message}
+            </FormErrorMessage>
+          </FormControl>
+
+          <Button 
+            onClick={handleLoginClick}
+            colorScheme="blue" 
+            width="full"
+            isLoading={isSubmitting}
+          >
+            Login
+          </Button>
+        </VStack>
+      </form>
+    </Box>
+  );
+};
+
+export default Login;
