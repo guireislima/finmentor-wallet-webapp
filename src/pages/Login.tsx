@@ -1,7 +1,7 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { Box, Button, FormControl, FormLabel, Input, VStack, useToast, FormErrorMessage, Flex, Link, Text } from '@chakra-ui/react';
+import { Box, Button, FormControl, FormLabel, Input, VStack, useToast, FormErrorMessage, Flex, Link } from '@chakra-ui/react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -68,11 +68,11 @@ const Login: React.FC = () => {
   };
 
   return (
-    <Box width="100vw" height="100vh">
+    <Box bg="gray.100" width="100vw" height="100vh">
       <Flex minH="100vh" align="center" justify="center" width="100%">
-        <Box width="400px" p={6} borderWidth="1px" borderRadius="lg" boxShadow="lg">
+        <Box bg="white" width="400px" p={6} borderWidth="1px" borderRadius="lg" boxShadow="lg">
           <form onSubmit={handleSubmit(onSubmit)}>
-            <VStack spacing={4}>
+            <VStack gap={4}>
               <FormControl isInvalid={!!errors.login}>
                 <FormLabel>Login</FormLabel>
                 <Input
