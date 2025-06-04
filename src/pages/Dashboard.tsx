@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Heading, Flex, Text, Spinner, useToast, Grid, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Input, useDisclosure, IconButton } from '@chakra-ui/react';
+import { Box, Button, Heading, Flex, Text, Spinner, useToast, Grid, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Input, useDisclosure, IconButton, Tabs, TabList, Tab, TabPanels, TabPanel, Select } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
-import { EditIcon } from '@chakra-ui/icons';
+import { EditIcon, DeleteIcon } from '@chakra-ui/icons';
 
 interface WalletAsset {
   id: string;
@@ -61,6 +61,20 @@ const Dashboard: React.FC = () => {
   const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
   const [editingWalletName, setEditingWalletName] = useState('');
   const [updatingWallet, setUpdatingWallet] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingWalletId, setDeletingWalletId] = useState<string | null>(null);
+  const [deletingWallet, setDeletingWallet] = useState(false);
+  const [assetTabIndex, setAssetTabIndex] = useState(0);
+  const [fixedName, setFixedName] = useState('');
+  const [fixedClass, setFixedClass] = useState('');
+  const [fixedCurrency, setFixedCurrency] = useState('');
+  const [fixedInterest, setFixedInterest] = useState('');
+  const [fixedBase, setFixedBase] = useState('');
+  const [variableName, setVariableName] = useState('');
+  const [variableClass, setVariableClass] = useState('');
+  const [variableCurrency, setVariableCurrency] = useState('');
+  const [variableQuotation, setVariableQuotation] = useState('');
+  const [creatingAsset, setCreatingAsset] = useState(false);
 
   const rowColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD'];
 
@@ -234,28 +248,153 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  return (
-    <Box bg="gray.100" width="100vw" minHeight="100vh">
-      <Box>
-        <Flex p={10} justify="space-between" align="center" mb={4} bg="white" boxShadow={"lg"} width="100vw">
-          <Box>
-            <Flex align="center" gap={4}>
-              <Heading as="h1" size="2xl" fontWeight="bold" color="blue.500">
-                Finmentor
-              </Heading>
-              <Text fontSize="3xl" color="blue.500" height="40px">|</Text>
-              <Text fontSize="lg" color="black" height="16px">
-                Wallets
-              </Text>
-            </Flex>
-          </Box>
+  const openDeleteModal = (wallet: Wallet) => {
+    setDeletingWalletId(wallet.id);
+    setDeleteModalOpen(true);
+  };
 
-          <Flex gap={4}>
-            <Button width="100px" colorScheme="blue" onClick={handleLogout}>
-              Logout
-            </Button>
+  const closeDeleteModal = () => {
+    setDeleteModalOpen(false);
+    setDeletingWalletId(null);
+  };
+
+  const handleDeleteWallet = async () => {
+    if (!deletingWalletId) return;
+    setDeletingWallet(true);
+    try {
+      await axios.delete(`http://localhost:8081/v1/wallets/${deletingWalletId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      closeDeleteModal();
+      setLoading(true);
+      // Re-fetch wallets
+      const response = await axios.get('http://localhost:8081/v1/wallets', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const walletsData = response.data.map((wallet: any) => ({ ...wallet, walletAssets: [] }));
+      setWallets(walletsData);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to delete wallet.';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top',
+      });
+    } finally {
+      setDeletingWallet(false);
+      setLoading(false);
+    }
+  };
+
+  const handleCreateAsset = async () => {
+    let name, shortName, type, currency, value, valueBase, assetClass;
+    if (assetTabIndex === 0) {
+      // Fixed
+      name = fixedName.trim();
+      shortName = name.slice(0, 3).toUpperCase();
+      type = 'FIXED_ASSET';
+      currency = fixedCurrency.trim();
+      value = fixedInterest.trim();
+      valueBase = fixedBase.trim();
+      assetClass = fixedClass.trim();
+      if (!name || !currency || !value || !valueBase || !assetClass) {
+        toast({
+          title: 'Error',
+          description: 'Please fill all mandatory fields for Fixed Asset.',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'top',
+        });
+        return;
+      }
+    } else {
+      // Variable
+      name = variableName.trim();
+      shortName = name.slice(0, 3).toUpperCase();
+      type = 'VARIABLE_ASSET';
+      currency = variableCurrency.trim();
+      value = variableQuotation.trim();
+      assetClass = variableClass.trim();
+      if (!name || !currency || !value || !assetClass) {
+        toast({
+          title: 'Error',
+          description: 'Please fill all mandatory fields for Variable Asset.',
+          status: 'error',
+          duration: 4000,
+          isClosable: true,
+          position: 'top',
+        });
+        return;
+      }
+    }
+    const body = {
+      name,
+      shortName,
+      type,
+      currency,
+      value,
+      ...(assetTabIndex === 0 ? { valueBase } : {}),
+      class: assetClass,
+    };
+    setCreatingAsset(true);
+    try {
+      await axios.post('http://localhost:8081/v1/assets', body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast({
+        title: 'Success',
+        description: 'Asset created successfully!',
+        status: 'success',
+        duration: 4000,
+        isClosable: true,
+        position: 'top',
+      });
+      // Optionally clear fields
+      setFixedName(''); setFixedClass(''); setFixedCurrency(''); setFixedInterest(''); setFixedBase('');
+      setVariableName(''); setVariableClass(''); setVariableCurrency(''); setVariableQuotation('');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Failed to create asset.';
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+        position: 'top',
+      });
+    } finally {
+      setCreatingAsset(false);
+    }
+  };
+
+  return (
+    <Box bg="gray.100" width="100vw" minHeight="100vh" display="flex" flexDirection="column">
+      <Box flex="1">
+        <Box>
+          <Flex p={10} justify="space-between" align="center" mb={4} bg="white" boxShadow={"lg"} width="100vw">
+            <Box>
+              <Flex align="center" gap={4}>
+                <Heading as="h1" size="2xl" fontWeight="bold" color="blue.500">
+                  Finmentor
+                </Heading>
+                <Text fontSize="3xl" color="blue.500" height="40px">|</Text>
+                <Text fontSize="lg" color="black" height="16px">
+                  Wallets
+                </Text>
+              </Flex>
+            </Box>
+
+            <Flex gap={4}>
+              <Button width="100px" colorScheme="blue" onClick={handleLogout}>
+                Logout
+              </Button>
+            </Flex>
           </Flex>
-        </Flex>
+        </Box>
 
         <Text style={{ fontSize: 50 }} color="gray.700" align={"center"} mt={10}>
           Welcome to your financial dashboard.
@@ -299,10 +438,8 @@ const Dashboard: React.FC = () => {
                   <Flex justify="space-between" align="center">
                     <Text fontWeight="medium" fontSize="lg">{wallet.name}</Text>
                     <Flex gap={6} align="center">
-                      <Text>{formatDate(wallet.createdAt)}</Text>
-                      <Text fontWeight="bold">
-                        {wallet.sum.toFixed(2)}
-                      </Text>
+                      <Text>Created at {formatDate(wallet.createdAt)}</Text>
+                      
                       <IconButton
                         aria-label="Edit wallet name"
                         icon={<EditIcon color="white" />} 
@@ -313,6 +450,18 @@ const Dashboard: React.FC = () => {
                         onClick={(e) => {
                           e.stopPropagation();
                           openEditModal(wallet);
+                        }}
+                      />
+                      <IconButton
+                        aria-label="Delete wallet"
+                        icon={<DeleteIcon color="white" />} 
+                        size="sm"
+                        colorScheme="red"
+                        variant="ghost"
+                        ml={2}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteModal(wallet);
                         }}
                       />
                     </Flex>
@@ -341,15 +490,14 @@ const Dashboard: React.FC = () => {
                         borderBottom="1px solid gray"
                         fontWeight="bold"
                       >
-                        <Grid templateColumns="repeat(8, 1fr)" gap={2} alignItems="center">
-                          <Text>Identifier</Text>
+                        <Grid templateColumns="repeat(7, 1fr)" gap={2} alignItems="center">
                           <Text>Class</Text>
                           <Text>Name</Text>
                           <Text>Custody</Text>
                           <Text>Asset</Text>
-                          <Text>Total</Text>
-                          <Text>Yield</Text>
                           <Text>Acquired at</Text>
+                          <Text>Value</Text>
+                          <Text>Yield</Text>
                         </Grid>
                       </Box>
                       {loadingAssets === wallet.id ? (
@@ -362,15 +510,14 @@ const Dashboard: React.FC = () => {
                             bg={assetIndex % 2 === 0 ? "gray.50" : "gray.100"}
                             borderBottom="1px solid gray"
                           >
-                            <Grid templateColumns="repeat(8, 1fr)" gap={2} alignItems="center">
-                              <Text>{asset.identifier}</Text>
+                            <Grid templateColumns="repeat(7, 1fr)" gap={2} alignItems="center">
                               <Text>{asset.class}</Text>
                               <Text>{asset.name}</Text>
                               <Text>{asset.custody}</Text>
                               <Text>{asset.asset}</Text>
-                              <Text>{asset.currency + " " + asset.total}</Text>
-                              <Text>{asset.yield + "%"}</Text>
                               <Text>{formatDate(asset.acquired)}</Text>
+                              <Text>{asset.currency + " " + asset.total.toFixed(2)}</Text>
+                              <Text>{asset.yield + "%"}</Text>
                             </Grid>
                           </Box>
                         ))
@@ -380,6 +527,89 @@ const Dashboard: React.FC = () => {
                 </Box>
               </Box>
             ))}
+          </Box>
+        </Box>
+        {/* Create New Asset Section */}
+        <Box width="40%" ml="10%" mt={16} mb={16}>
+          <Box border="2px solid black" bg="white" boxShadow="lg" borderRadius="0" p={8} position="relative">
+            <Text fontSize={25} color="gray.600" fontWeight="bold" mb={4}>
+              Create new asset
+            </Text>
+            <Tabs variant="unstyled" colorScheme="blue" index={assetTabIndex} onChange={setAssetTabIndex}>
+              <TabList mb={6}>
+                <Tab _selected={{ bg: 'blue.500', color: 'white' }} fontWeight="bold" borderTopLeftRadius="md" borderTopRightRadius="md" px={8} py={2} mr={2}>Fixed</Tab>
+                <Tab _selected={{ bg: 'blue.500', color: 'white' }} fontWeight="bold" borderTopLeftRadius="md" borderTopRightRadius="md" px={8} py={2}>Variable</Tab>
+              </TabList>
+              <TabPanels>
+                {/* Fixed Tab */}
+                <TabPanel px={0}>
+                  <Box as="form" width="100%">
+                    <Flex align="center" mb={4} width="90%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Name</Text>
+                      <Input borderRadius="0" height="36px" width="100%" value={fixedName} onChange={e => setFixedName(e.target.value)} />
+                    </Flex>
+                    <Flex align="center" mb={4} width="50%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Class</Text>
+                      <Select borderRadius="0" height="36px" width="100%" value={fixedClass} onChange={e => setFixedClass(e.target.value)}>
+                        <option value="">Select class</option>
+                        <option value="Tesouro">Tesouro direto</option>
+                        <option value="CDB">CDB</option>
+                        <option value="LCI">LCI</option>
+                        <option value="LCA">LCA</option>
+                        <option value="FundoRF">Fundo de renda fixa</option>
+                      </Select>
+                    </Flex>
+                    <Flex align="center" mb={4} width="25%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Currency</Text>
+                      <Input borderRadius="0" height="36px" width="100%" value={fixedCurrency} onChange={e => setFixedCurrency(e.target.value)} />
+                    </Flex>
+                    <Flex align="center" mb={4} width="90%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Interest (%)</Text>
+                      <Input borderRadius="0" height="36px" width="30%" mr={6} value={fixedInterest} onChange={e => setFixedInterest(e.target.value)} />
+                      <Text minW="40px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Base</Text>
+                      <Select borderRadius="0" height="36px" width="80%" value={fixedBase} onChange={e => setFixedBase(e.target.value)}>
+                        <option value="">Select base</option>
+                        <option value="CDI">CDI</option>
+                        <option value="SELIC">SELIC</option>
+                        <option value="IPCA">IPCA</option>
+                      </Select>
+                    </Flex>
+                  </Box>
+                </TabPanel>
+                {/* Variable Tab */}
+                <TabPanel px={0}>
+                  <Box as="form" width="100%">
+                    <Flex align="center" mb={4} width="90%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Name</Text>
+                      <Input borderRadius="0" height="36px" width="100%" value={variableName} onChange={e => setVariableName(e.target.value)} />
+                    </Flex>
+                    <Flex align="center" mb={4} width="50%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Class</Text>
+                      <Select borderRadius="0" height="36px" width="100%" value={variableClass} onChange={e => setVariableClass(e.target.value)}>
+                        <option value="">Select class</option>
+                        <option value="Ação">Ação</option>
+                        <option value="FII">FII</option>
+                        <option value="Stock">Stock</option>
+                        <option value="REIT">REIT</option>
+                        <option value="Criptomoeda">Criptomoeda</option>
+                        <option value="Multimercado">Fundo multimercado</option>
+                      </Select>
+                    </Flex>
+                    <Flex align="center" mb={4} width="25%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Currency</Text>
+                      <Input borderRadius="0" height="36px" width="100%" value={variableCurrency} onChange={e => setVariableCurrency(e.target.value)} />
+                    </Flex>
+                    <Flex align="center" mb={4} width="50%">
+                      <Text minW="90px" color="gray.700" fontWeight="medium" textAlign="right" mr={4}>Quotation</Text>
+                      <Input borderRadius="0" height="36px" width="100%" value={variableQuotation} onChange={e => setVariableQuotation(e.target.value)} />
+                    </Flex>
+                  </Box>
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+            <Flex justify="flex-end" mt={4}>
+              <Button colorScheme="blue" width="150px" borderRadius="0" onClick={handleCreateAsset} isLoading={creatingAsset}>Create</Button>
+            </Flex>
           </Box>
         </Box>
         {/* New Wallet Modal */}
@@ -427,6 +657,25 @@ const Dashboard: React.FC = () => {
                 Confirm
               </Button>
               <Button variant="ghost" onClick={closeEditModal}>
+                Cancel
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+        {/* Delete Wallet Modal */}
+        <Modal isOpen={deleteModalOpen} onClose={closeDeleteModal} isCentered>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Delete Wallet</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <Text>Are you sure you want to delete this wallet? This action cannot be undone.</Text>
+            </ModalBody>
+            <ModalFooter>
+              <Button colorScheme="red" mr={3} onClick={handleDeleteWallet} isLoading={deletingWallet}>
+                Delete
+              </Button>
+              <Button variant="ghost" onClick={closeDeleteModal}>
                 Cancel
               </Button>
             </ModalFooter>
